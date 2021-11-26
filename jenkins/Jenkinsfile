@@ -23,29 +23,13 @@ pipeline {
             }
         }
 
-        stage('Build & Generate Test Report') {
-            agent {
-                docker {
-                    image 'maven:3-alpine'
-                }
-            }
-            steps {
-                script {
-                   try {
-                       sh "mvn package"
-                   } finally {
-                       junit '**/build/test-results/test/*.xml' //make
-                       
-                   }
-                }
-            }
-        }
+
 
        stage('Publish Test Coverage Report') {
            steps {
                step([$class: 'JacocoPublisher',
-                   execPattern: '**/build/jacoco/*.exec',
-                   classPattern: '**/build/classes',
+                   execPattern: '**/target/jacoco.exec',
+                   classPattern: '**/target/classes',
                    sourcePattern: 'src/main/java',
                    exclusionPattern: 'src/test*'
                ])
