@@ -12,7 +12,7 @@ pipeline {
                 sh "mvn package -Dmaven.test.skip=true"
             }
         }
-        stage('Test') {
+        stage('T2-Test') {
             agent {
                 docker {
                     image 'maven:3-alpine'
@@ -21,6 +21,14 @@ pipeline {
             steps {
                 sh "mvn test"
             }
+        }
+        stage('Coverage-JaCoCO') {
+            step([$class: 'JacocoPublisher',
+                  execPattern: 'target/*.exec',
+                  classPattern: 'target/classes',
+                  sourcePattern: 'src/main/java',
+                  exclusionPattern: 'src/test*'
+            ])
         }
     }
 }
