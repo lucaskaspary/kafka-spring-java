@@ -2,41 +2,69 @@
 pipeline {
     agent any
     stages{
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('MVN dependencies checks') {
+            when {
+                expression { params.mvnDependenciesChecksEnabled }
+            }
+            steps {
+                withMaven(
+                        maven: 'Maven 3.5.2',
+                        mavenLocalRepo: '.repository'
+                ) {
+                    echo "MVN dependencies checks [unused / missing / bad scope / etc.]"
+                    sh "mvn org.apache.maven.plugins:maven-dependency-plugin:analyze-report"
+                }
+            }
+        }
         stage('Build') {
-            agent {
-                docker {
-                    image 'maven:3-alpine'
+            steps {
+                withMaven(
+                        maven: 'Maven 3.5.2',
+                        mavenLocalRepo: '.repository'
+                ){
+                    script {
+                        if (params.qualityControlEnabled) {
+                            // On human request only
+                            echo "Building with QUALITY controls from ${BRANCH_NAME} ..."
+                            sh "mvn clean install -Pquality_control"
+                        } else {
+                            // Default case - for automatic builds
+                            echo "Standard build"
+                            sh "mvn clean install"
+                        }
+                    }
                 }
             }
-            steps {
-                sh "mvn package -Dmaven.test.skip=true"
-            }
         }
-        stage('T2-Test') {
-            agent {
-                docker {
-                    image 'maven:3-alpine'
+
+        stage('SonarQube') {
+            when {
+                expression { params.qualityControlEnabled }
+            }
+            steps {
+                withMaven(
+                        maven: 'Maven 3.5.2',
+                        mavenLocalRepo: '.repository'
+                ){
+                    withSonarQubeEnv('sonarqube') {
+                        echo "Static code analysis with SonarQube runner"
+                        // TODO ensure the version of the plugin matches the one in the PARENT pom
+                        sh "mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar -Dsonar.projectName=\"my_project ($BRANCH_NAME)\" -Dsonar.projectKey=my_project:$BRANCH_NAME -Pquality_control"
+                    }
                 }
             }
-            steps {
-                sh "mvn test"
-            }
         }
-
-
-
-       stage('Publish Test Coverage Report') {
-           steps {
-               step([$class: 'JacocoPublisher',
-                   execPattern: '**/target/jacoco.exec',
-                   classPattern: '**/target/classes',
-                   sourcePattern: 'src/main/java',
-                   exclusionPattern: 'src/test*'
-               ])
-           }
-       }
-
-
-
+    }
+    post {
+        always {
+            echo 'Cleaning workspace'
+            deleteDir()
+        }
     }
 }
