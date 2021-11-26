@@ -9,9 +9,7 @@ pipeline {
                 }
             }
             steps {
-                sh "cd kafka-consumer"
                 sh "mvn package -Dmaven.test.skip=true"
-                sh "cd .."
             }
         }
     }
